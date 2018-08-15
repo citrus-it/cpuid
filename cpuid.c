@@ -121,6 +121,9 @@ static inline BOOL cpuid(uint32_t *_eax, uint32_t *_ebx, uint32_t *_ecx, uint32_
 }
 
 #endif
+
+static inline uint64_t rdmsr(uint32_t msr)
+{ }
 #endif
 
 #ifdef TARGET_COMPILER_GCC
@@ -157,6 +160,29 @@ static inline BOOL cpuid(uint32_t *_eax, uint32_t *_ebx, uint32_t *_ecx, uint32_
 	      "=d" (*_edx)
 	    : "0" (*_eax), "2" (*_ecx));
 	return TRUE;
+}
+
+inline uint64_t rdmsr(uint32_t msr)
+{
+#ifdef TARGET_CPU_X86
+	uint32_t low;
+
+	asm volatile(
+	    "rdmsr"
+	    : "=a" (low)
+	    : "c" (msr)
+	    : "rdx");
+	return low;
+#else
+	uint32_t low, high;
+
+	asm volatile(
+	    "rdmsr"
+	    : "=a" (low),
+	      "=d" (high)
+	    : "c" (msr));
+	return low | ((uint64_t)high << 32);
+#endif
 }
 
 #endif

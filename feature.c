@@ -37,6 +37,8 @@ typedef enum
 	REG_NULL = 255
 } cpu_register_t;
 
+#define IA32_ARCH_CAPABILITIES_MSR	0x10a
+
 static const char *reg_name(cpu_register_t reg)
 {
 	static const char *reg_names[] = {
@@ -875,6 +877,35 @@ void print_features(const struct cpu_regs_t *regs, struct cpuid_state_t *state)
 				*acct_reg &= (~p->m_bitmask);
 			}
 		}
+
+		if (!strcmp(p->m_name, "IA32_ARCH_CAPABILITIES MSR")
+			&& (*reg & p->m_bitmask) != 0
+			&& (ignore_vendor || (int)p->m_vendor == VENDOR_ANY
+			|| (state->vendor & p->m_vendor) != 0))
+		{
+			uint32_t msr = rdmsr(IA32_ARCH_CAPABILITIES_MSR);
+			struct ia32_arch_feat_t {
+				unsigned int mask;
+				const char *name;
+			} arch_features[] = {
+				/*
+Ref: https://software.intel.com/security-software-guidance/api-app/sites/default/files/336996-Speculative-Execution-Side-Channel-Mitigations.pdf
+				 */
+				{0x00000001, "Not susceptible to Rogue Data Cache Load (RDCL)"},
+				{0x00000002, "Enhanced IBRS"},
+				{0x00000004, "RSB Alternate"},
+				{0x00000008, "Skip L1D flush on VM entry"},
+				{0x00000010, "Not susceptible to Speculative Store Bypass (SSB)"},
+				{0x00000000, NULL}
+			};
+			struct ia32_arch_feat_t *feat;
+
+			printf("     = %x\n", msr);
+			for (feat = arch_features; feat->name; feat++)
+				if ((msr & feat->mask) != 0)
+					printf("       %s\n", feat->name);
+		}
+
 		p++;
 	}
 
